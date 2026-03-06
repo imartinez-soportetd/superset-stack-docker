@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18.1
+    image: postgres:18.3
     environment:
       POSTGRES_USER: superset
       POSTGRES_PASSWORD: superset
@@ -33,10 +33,9 @@ services:
         limits:
           memory: 256M
   valkey:
-    image: valkey/valkey:8.0
+    image: valkey/valkey:9.0.3
     environment:
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
     ports:
       - "6380:6379"
@@ -50,7 +49,7 @@ services:
       - ./valkey_data:/data
 
   cube:
-    image: cubejs/cube:v0.36.0
+    image: cubejs/cube:v1.6.19
     ports:
       - "4000:4000"
       - "15432:15432"
@@ -63,7 +62,6 @@ services:
       - CUBEJS_PG_SQL_PORT=15432
       - CUBEJS_STATSD_URL=statsd://statsd-exporter:9125
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
       # Multi-source Configuration
       - CUBEJS_DATASOURCES=default,extra_postgres
@@ -75,10 +73,10 @@ services:
       - CUBEJS_DB_PASS=superset
       # Extra Source (External Placeholder)
       - CUBEJS_DS_EXTRA_POSTGRES_DB_TYPE=postgres
-      - CUBEJS_DS_EXTRA_POSTGRES_DB_HOST=host.docker.internal
-      - CUBEJS_DS_EXTRA_POSTGRES_DB_NAME=external_db
-      - CUBEJS_DS_EXTRA_POSTGRES_DB_USER=user
-      - CUBEJS_DS_EXTRA_POSTGRES_DB_PASS=password
+      - CUBEJS_DS_EXTRA_POSTGRES_DB_HOST=10.4.3.23
+      - CUBEJS_DS_EXTRA_POSTGRES_DB_NAME=dw
+      - CUBEJS_DS_EXTRA_POSTGRES_DB_USER=superset_user
+      - CUBEJS_DS_EXTRA_POSTGRES_DB_PASS=L5upMXEjhdU0pajcGttf
     volumes:
       - ./cube_schema:/cube/conf/model
     depends_on:
@@ -93,7 +91,7 @@ services:
     build: 
       context: ./docker/superset
       args:
-        PYPI_MIRROR: ${PYPI_MIRROR:-http://mirrors.cloud.tencent.com/pypi/simple/}
+        PYPI_MIRROR: ${PYPI_MIRROR:-https://pypi.org/simple/}
     image: custom-superset:latest
     environment:
       - SUPERSET_ENV=production
@@ -124,7 +122,6 @@ services:
       - WEBDRIVER_BASEURL=${WEBDRIVER_BASEURL}
       - SECRET_KEY=${SECRET_KEY}
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
     volumes:
       - ./superset_config.py:/app/pythonpath/superset_config.py
@@ -139,7 +136,7 @@ services:
       valkey:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/tableros/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -164,9 +161,6 @@ services:
       - CELERY_BROKER_URL=redis://valkey:6379/0
       - CELERY_RESULT_BACKEND=redis://valkey:6379/0
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
-      - ENABLE_PROXY_FIX=true
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
       - ROW_LIMIT=${ROW_LIMIT}
       - SUPERSET_WEBSERVER_PORT=${SUPERSET_WEBSERVER_PORT}
@@ -202,7 +196,6 @@ services:
       - CELERY_BROKER_URL=redis://valkey:6379/0
       - CELERY_RESULT_BACKEND=redis://valkey:6379/0
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
       - SECRET_KEY=${SECRET_KEY}
       - SUPERSET_ADMIN_PASSWORD=${SUPERSET_ADMIN_PASSWORD}
@@ -220,7 +213,7 @@ services:
     build:
       context: ./docker/prefect
       args:
-        PYPI_MIRROR: ${PYPI_MIRROR:-http://mirrors.cloud.tencent.com/pypi/simple/}
+        PYPI_MIRROR: ${PYPI_MIRROR:-https://pypi.org/simple/}
     command: prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"
@@ -230,7 +223,7 @@ services:
 
 
   prometheus:
-    image: prom/prometheus:v2.55.1
+    image: prom/prometheus:v3.10.0
     user: root
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
@@ -240,11 +233,10 @@ services:
     command: --config.file=/etc/prometheus/prometheus.yml --web.external-url=/prometheus/
     environment:
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
 
   grafana:
-    image: grafana/grafana:12.3.1
+    image: grafana/grafana:12.4.0
     ports:
       - "3000:3000"
     depends_on:
@@ -254,7 +246,6 @@ services:
       - GF_SERVER_ROOT_URL=http://${DOMAIN}/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
     volumes:
       - ./grafana_data:/var/lib/grafana
@@ -262,12 +253,11 @@ services:
       - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    image: ghcr.io/google/cadvisor:0.56.2
     ports:
       - "8080:8080"
     environment:
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
       - DOCKER_API_VERSION=1.44
     volumes:
@@ -280,7 +270,7 @@ services:
       - valkey
 
   statsd-exporter:
-    image: prom/statsd-exporter:v0.28.0
+    image: prom/statsd-exporter:v0.29.0
     container_name: statsd-exporter
     ports:
       - "9102:9102"
@@ -291,11 +281,10 @@ services:
           memory: 128M
     environment:
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.5.0
+    image: quay.io/keycloak/keycloak:26.5.5
     ports:
       - "8001:8080"
     environment:
@@ -305,17 +294,15 @@ services:
       - KC_HTTP_ENABLED=true
       - KC_HTTP_RELATIVE_PATH=/auth
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
     command: start-dev
 
   nginx:
-    image: nginx:1.27
+    image: nginx:1.28.2
     ports:
       - "80:80"
     environment:
       - TZ=America/Mexico_City
-      - SCRIPT_NAME=/tableros
       - ENABLE_PROXY_FIX=true
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
@@ -328,22 +315,56 @@ services:
       - cube
       - cadvisor
 
-#   superset-mcp:
-#     build: 
-#       context: ./superset-mcp
-#     environment:
-#       - SUPERSET_BASE_URL=http://superset:8088
-#       - SUPERSET_USERNAME=${SUPERSET_ADMIN_USERNAME}
-#       - SUPERSET_PASSWORD=${SUPERSET_ADMIN_PASSWORD}
-#       - MCP_TRANSPORT=sse
-#       - MCP_PORT=8010
-#     ports:
-#       - "8010:8010"
-#     depends_on:
-#       - superset
+  superset-mcp:
+    build: 
+      context: ./superset-mcp
+    environment:
+      - SUPERSET_BASE_URL=http://superset:8088
+      - SUPERSET_USERNAME=admin
+      - SUPERSET_PASSWORD=admin
+      - MCP_TRANSPORT=sse
+      - MCP_PORT=8010
+      - TZ=America/Mexico_City
+    ports:
+      - "8010:8010"
+    depends_on:
+      - superset
+
+  flowise:
+    image: flowiseai/flowise:latest
+    environment:
+      - PORT=3001
+      - DATABASE_PATH=/root/.flowise
+      - APIKEY_PATH=/root/.flowise
+      - SECRETKEY_PATH=/root/.flowise
+      - LOG_PATH=/root/.flowise
+      - TZ=America/Mexico_City
+    ports:
+      - "3001:3001"
+    volumes:
+      - flowise_data:/root/.flowise
+    restart: always
+
+  vanna-ai:
+    build:
+      context: ./vanna-ai
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=superset
+      - POSTGRES_USER=superset
+      - POSTGRES_PASSWORD=superset
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "8011:8011"
+    volumes:
+      - vanna_data:/app/vanna_db
+    depends_on:
+      - postgres
 
 volumes:
   postgres_data:
   superset_home:
     name: superset-project_superset_home
   grafana_data:
+  flowise_data:
+  vanna_data:

@@ -130,7 +130,7 @@ cube(`Pedidos`, {
 Una vez configurado, construye e inicia el stack.
 
 > [!TIP]
-> **Entornos Restringidos**: Si tu red bloquea `pypi.org`, el proyecto está configurado para usar automáticamente el mirror de **Tsinghua**. Puedes cambiarlo en el `.env` ajustando la variable `PYPI_MIRROR`.
+> **Gestión de Red**: El proyecto está configurado para usar **pypi.org** por defecto. Si tu red lo bloquea, puedes usar el mirror configurado en `.env` ajustando la variable `PYPI_MIRROR`. El sistema intentará usar el mirror como respaldo automáticamente.
 
 ```bash
 # 1. Construir imágenes personalizadas (Necesario para Reportes y Prefect)
@@ -149,6 +149,11 @@ docker compose exec superset superset fab create-admin --username admin --passwo
 
 # Inicializar roles y permisos
 docker compose exec superset superset init
+
+# 4. Inicializar Capa de IA (Opcional pero Recomendado)
+
+# Entrenar a Vanna con el esquema de la base de datos
+curl -X POST http://localhost/vanna/train/schema
 ```
 
 ## 5. Exploración y Modelado (Playground)

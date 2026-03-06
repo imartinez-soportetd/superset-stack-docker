@@ -8,51 +8,53 @@ La solución se estructura en capas para aislar responsabilidades y maximizar el
 
 | Capa | Componente Clave | Propósito Principal |
 | :--- | :--- | :--- |
-| **Orquestación** | Prefect v3.x | Gestión de Pipelines de datos (ETL/ELT) y ML Ops. **(Imagen Personalizada con ML libs)** |
-| **Modelado Semántico** | Cube.js (v0.36.0) | Definición centralizada de métricas y caching de pre-agregados (Motor Cube Store). |
+| **Inteligencia Artificial** | Flowise AI / Vanna AI | Orquestador de agentes y asistente SQL para "Chat with Data". |
+| **Orquestación** | Prefect v3.x | Gestión de Pipelines de datos (ETL/ELT) y ML Ops. |
+| **Modelado Semántico** | Cube.js (v1.6.19) | Definición centralizada de métricas y caching de pre-agregados. |
 | **Visualización / BI** | Apache Superset (v6.0.0) | Exploración de datos, Dashboards y reportes programados. |
-| **Datos / Metadatos** | PostgreSQL (v18.1) | Almacenamiento de datos fuente, resultados de ML y metadatos de Superset. |
-| **Caché / Broker** | Valkey (v8.0) | Reemplazo open-source de Redis para caché de Superset y broker de Celery. |
-| **Proxy / Acceso** | Nginx (v1.27) | Puerta de enlace unificada (Puerto 80) para todos los servicios. |
-| **Identidad** | Keycloak (v26.5.0) | Gestión de identidad y acceso (OIDC) en Puerto 8001. |
-| **Observabilidad** | Prometheus (v2.55.1) + Grafana (v12.3.1) | Monitoreo del estado de todos los servicios críticos. |
-| **Métricas Host** | cAdvisor (v0.51.0) | Exportador de métricas de contenedores para Prometheus. |
+| **Datos / Metadatos** | PostgreSQL (v18.3) | Almacenamiento de datos fuente, resultados de ML y metadatos. |
+| **Caché / Broker** | Valkey (v9.0.3) | Reemplazo de Redis para caché y broker de Celery. |
+| **Proxy / Acceso** | Nginx (v1.28.2) | Puerta de enlace unificada (Puerto 80) para todos los servicios. |
+| **Identidad** | Keycloak (v26.5.5) | Gestión de identidad y acceso (OIDC) en Puerto 8001. |
+| **Observabilidad** | Prometheus (v3.10.0) + Grafana (v12.4.0) | Monitoreo del estado de todos los servicios críticos. |
 
-### 1.1. Integración de ML (Proof of Concept)
+### 1.1. Capa de Inteligencia y ML
 
-Se ha implementado un flujo de prueba de concepto (`ml_sales_pipeline.py`) que demuestra:
+El proyecto integra capacidades de IA generativa:
+- **Flowise AI**: Permite crear flujos de agentes RAG y asistentes conversacionales visuales.
+- **Vanna AI**: Agente especializado en generar queries SQL a partir de lenguaje natural (Natural Language to SQL).
+- **Superset MCP**: Implementación del *Model Context Protocol* para controlar Superset desde agentes externos como Claude Desktop.
 
-1. **Extracción**: Prefect verifica datos en PostgreSQL.
-2. **ML**: Prefect entrena un modelo (`scikit-learn`) y genera predicciones de ventas.
-3. **Carga**: Guarda resultados en la tabla `ml_prediccion_ventas`.
-4. **Refresco**: Prefect notifica a Cube.js para refrescar la semántica.
-5. **Visualización**: Cube.js sirve los datos frescos a Superset.
-
-### 1.2. Diagrama de Arquitectura
+### 1.2. Diagrama de Arquitectura Moderna
 
 ```mermaid
 graph TD
     User((Usuario)) --> Nginx[Nginx Proxy :80]
     
-    subgraph "Public Services"
+    subgraph "AI & Frontends"
         Nginx --> Superset[Apache Superset :8088]
+        Nginx --> Flowise[Flowise AI :3001]
         Nginx --> Keycloak[Keycloak :8001]
-        Nginx --> PrefectUI[Prefect UI :4200]
-        Nginx --> Grafana[Grafana :3000]
+        Nginx --> Grafana[Grafana :12.4]
     end
 
-    subgraph "Data & Logic"
-        Superset --> Postgres[(PostgreSQL :5432)]
-        Superset --> Valkey[Valkey Cache :6379]
-        Superset --> Cube[Cube.js :4000]
+    subgraph "Intelligent Logic"
+        Flowise --> Vanna[Vanna.ai :8011]
+        Vanna --> Postgres[(PostgreSQL)]
+        Superset-MCP[MCP Server :8010] --> Superset
+        Prefect[Prefect Server] --> Cube[Cube.js]
+    end
+
+    subgraph "Data Backbone"
+        Superset --> Postgres
+        Superset --> Valkey[Valkey :9.0]
         Cube --> Postgres
-        Prefect[Prefect Server] --> Postgres
-        Prefect --> Cube
+        Prefect --> Postgres
     end
 
     subgraph "Observability"
-        Prometheus --> Superset
-        Prometheus --> Postgres
+        Prometheus[Prometheus :3.10] --> cAdvisor
+        cAdvisor --> Containers
         Grafana --> Prometheus
     end
 ```
@@ -96,7 +98,7 @@ Gracias al Proxy Inverso, todos los servicios son accesibles por la IP definida 
 
 | Servicio | URL |
 | :--- | :--- |
-| **Superset** | `http://TU_IP/tableros/` |
+| **Superset** | `http://TU_IP/` |
 | **Keycloak** | `http://TU_IP:8001/` |
 | **Vault** | `http://TU_IP:8200/` |
 | **Prefect UI** | `http://TU_IP/prefect/` |
@@ -265,12 +267,12 @@ El sistema permite cambiar la imagen corporativa sin modificar el código intern
    docker compose restart superset
    ```
 
-### 4.2. Configuración de Subruta (/tableros)
+### 4.2. Configuración de Subrutas (Opcional)
 
-El proyecto está configurado para correr bajo el prefijo `/tableros`. Si deseas cambiarlo, debes actualizar:
-- `.env`: Variable `SCRIPT_NAME`.
-- `superset_config.py`: `APPLICATION_ROOT` y `SESSION_COOKIE_PATH`.
-- `nginx.conf`: Directiva `location /tableros/` y todas las reglas de `sub_filter`.
+El proyecto está configurado para correr en la raíz (`/`). Si deseas ponerlo bajo un prefijo (ej: `/tableros`), debes actualizar:
+- `docker-compose.yml`: Añadir `SCRIPT_NAME=/tu-prefijo` a los servicios.
+- `superset_config.py`: `APPLICATION_ROOT` y `SESSION_COOKIE_PATH` a `/tu-prefijo`.
+- `nginx.conf`: Crear una directiva `location /tu-prefijo/` y configurar el proxy correspondientemente.
 
 ### 4.3. Solución de Problemas de Construcción (Build)
 
