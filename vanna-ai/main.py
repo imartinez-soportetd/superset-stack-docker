@@ -1,9 +1,14 @@
 import os
-from vanna.chromadb.chromadb_vector import ChromaDB_VectorStore
-from vanna.remote import VannaDefault
+try:
+    from vanna.chromadb import ChromaDB_VectorStore
+    from vanna.openai import OpenAI_Chat
+    from vanna.remote import VannaDefault
+except ImportError:
+    from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
+    from vanna.legacy.openai.openai_chat import OpenAI_Chat
+    from vanna.legacy.remote import VannaDefault
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from vanna.openai import OpenAI_Chat
 import psycopg2
 
 # Basic Setup
@@ -32,6 +37,10 @@ def connect_db():
 
 app = Flask(__name__)
 CORS(app)
+
+@app.route('/', methods=['GET'])
+def health():
+    return jsonify({"status": "Aura Vanna AI Service is running", "endpoints": ["/ask", "/train/schema"]})
 
 @app.route('/ask', methods=['POST'])
 def ask():

@@ -14,8 +14,7 @@ cube(`Orders`, {
 
     measures: {
         count: {
-            type: `count`,
-            draggable: true,
+            type: `count`
         },
         totalAmount: {
             sql: `amount`,

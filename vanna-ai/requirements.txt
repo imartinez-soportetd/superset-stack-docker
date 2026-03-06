@@ -1,5 +1,6 @@
-vanna[postgres]
+vanna[postgres,chromadb]
 chromadb
+openai
 flask
 flask-cors
 python-dotenv
